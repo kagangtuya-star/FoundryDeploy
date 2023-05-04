@@ -24,7 +24,13 @@ FoundryVTT 部署脚本
 
 *如果脚本需要更新，同样使用以下命令对**脚本**进行更新*
 ```bash
-wget -O fvtt.sh https://fvtt-cn.coding.net/p/FoundryDeploy/d/FoundryDeploy/git/raw/master/fvtt.sh && sudo chmod +x fvtt.sh
+海外服务器请用
+wget -O fvtt.sh https://raw.githubusercontent.com/fvtt-cn/FoundryDeploy/master/fvtt.sh && sudo chmod +x fvtt.sh
+大陆服务器请用
+wget -O fvtt.sh https://raw.fastgit.org/fvtt-cn/FoundryDeploy/master/fvtt.sh && sudo chmod +x fvtt.sh
+
+从30003端口部署
+wget -O fvtt.sh https://raw.githubusercontent.com/kagangtuya-star/FoundryDeploy/master/fvtt30003.sh && sudo chmod +x fvtt30003.sh
 ```
 
 ## 安装
