@@ -5,19 +5,19 @@
 SCRIPT_VERSION="1.6.4"
 
 # 容器名
-fvttname="fvtt"
-caddyname="caddy"
-fbname="filebr"
-dashname="portainer"
+fvttname="fvtt_second"
+caddyname="caddy_second"
+fbname="filebr_second"
+dashname="portainer_second"
 
-optimname="optimimages"
+optimname="optimimages_second"
 
 # 网桥/挂载名
-bridge="caddy_network"
-fvttvolume="fvtt_data"
-fvttapp="fvtt_appv"
-caddyvolume="caddy_data"
-dashvolume="portainer_data"
+bridge="caddy_network_second"
+fvttvolume="fvtt_data_second"
+fvttapp="fvtt_appv_second"
+caddyvolume="caddy_data_second"
+dashvolume="portainer_data_second"
 
 # 端口号（无域名使用）
 fvttport="30003"
