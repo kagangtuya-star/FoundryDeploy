@@ -30,7 +30,7 @@ wget -O fvtt.sh https://raw.githubusercontent.com/fvtt-cn/FoundryDeploy/master/f
 wget -O fvtt.sh https://raw.fastgit.org/fvtt-cn/FoundryDeploy/master/fvtt.sh && sudo chmod +x fvtt.sh
 
 从30003端口部署
-wget -O fvtt.sh https://raw.githubusercontent.com/kagangtuya-star/FoundryDeploy/master/fvtt30003.sh && sudo chmod +x fvtt30003.sh
+wget -O fvtt30003.sh https://raw.githubusercontent.com/kagangtuya-star/FoundryDeploy/master/fvtt30003.sh && sudo chmod +x fvtt30003.sh
 ```
 
 ## 安装
