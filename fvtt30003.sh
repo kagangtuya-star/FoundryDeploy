@@ -33,8 +33,8 @@ dashimage="portainer/portainer-ce"
 optimimage="hmqgg/image_optim"
 
 # 杂项，此处直接使用 PWD 有一定风险
-config="$PWD/fvtt-config"
-caddyfile="$PWD/Caddyfile"  # Caddy 配置
+config="$PWD/fvtt-config30003"
+caddyfile="$PWD/Caddyfile30003"  # Caddy 配置
 fbdatabase="$PWD/filebrowser.db" # FileBrowser 数据库
 caddycpu=256 # Caddy CPU 使用百分比
 fvttcpu=1024 # FoundryVTT CPU 使用百分比
