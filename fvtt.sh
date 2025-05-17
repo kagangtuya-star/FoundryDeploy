@@ -2,7 +2,7 @@
 
 # FoundryVTT 安装脚本默认参数
 
-SCRIPT_VERSION="1.6.4"
+SCRIPT_VERSION="1.6.5" # Incremented version for clarity of changes
 
 # 容器名
 fvttname="fvtt"
@@ -15,7 +15,7 @@ optimname="optimimages"
 # 网桥/挂载名
 bridge="caddy_network"
 fvttvolume="fvtt_data"
-fvttapp="fvtt_appv"
+fvttapp="fvtt_appv" # This volume will store app resources, needs 1000:1000 ownership
 caddyvolume="caddy_data"
 dashvolume="portainer_data"
 
@@ -25,7 +25,7 @@ fbport="30001"
 dashport="30002"
 
 # 镜像名
-fvttimage="felddy/foundryvtt:release"
+fvttimage="felddy/foundryvtt:release" # Assumed to be v13+
 caddyimage="library/caddy"
 fbimage="filebrowser/filebrowser:alpine"
 dashimage="portainer/portainer-ce"
@@ -321,8 +321,29 @@ fi
 # 创建网桥和挂载
 docker network create $bridge || warning "警告：创建网桥 ${bridge} 失败。通常是因为已经创建，如果正在升级，请无视该警告"
 
+# --- MODIFICATION START: Add chown for v13 compatibility ---
 docker volume create $fvttvolume || warning "警告：创建挂载 ${fvttvolume} 失败。通常是因为已经创建，如果正在升级，请无视该警告"
+# Get mountpoint and set ownership for v13 compatibility (container runs as 1000:1000)
+FVTT_DATA_MOUNTPOINT=$(docker volume inspect --format '{{ .Mountpoint }}' ${fvttvolume})
+if [ -n "$FVTT_DATA_MOUNTPOINT" ]; then
+    information "设置 ${FVTT_DATA_MOUNTPOINT} 的所有权为 1000:1000 以兼容 v13+"
+    # Since this script runs as root, sudo is not strictly necessary but doesn't hurt
+    chown -R 1000:1000 "$FVTT_DATA_MOUNTPOINT" || warning "警告：无法更改 ${FVTT_DATA_MOUNTPOINT} 的所有权。如果权限已正确，请忽略。"
+else
+    warning "警告：无法获取卷 ${fvttvolume} 的挂载点。可能会出现权限问题。"
+fi
+
 docker volume create $fvttapp || warning "警告：创建挂载 ${fvttapp} 失败。通常是因为已经创建，如果正在升级，请无视该警告"
+# Get mountpoint and set ownership for v13 compatibility
+FVTT_APP_MOUNTPOINT=$(docker volume inspect --format '{{ .Mountpoint }}' ${fvttapp})
+if [ -n "$FVTT_APP_MOUNTPOINT" ]; then
+    information "设置 ${FVTT_APP_MOUNTPOINT} 的所有权为 1000:1000 以兼容 v13+"
+    chown -R 1000:1000 "$FVTT_APP_MOUNTPOINT" || warning "警告：无法更改 ${FVTT_APP_MOUNTPOINT} 的所有权。如果权限已正确，请忽略。"
+else
+    warning "警告：无法获取卷 ${fvttapp} 的挂载点。可能会出现权限问题。"
+fi
+# --- MODIFICATION END ---
+
 docker volume create $caddyvolume || warning "警告：创建挂载 ${caddyvolume} 失败。通常是因为已经创建，如果正在升级，请无视该警告"
 [ "$dashyn" == "y" -o "$dashyn" == "Y" ] && { docker volume create $dashvolume || warning "警告：创建挂载 ${dashvolume} 失败。通常是因为已经创建，如果正在升级，请无视该警告"; }
 
@@ -415,10 +436,13 @@ caddyrun="${caddyrun}-p ${fvttport}:${fvttport} -p ${fvttport}:${fvttport}/udp -
 caddyrun="${caddyrun} ${caddyimage}"
 eval $caddyrun && docker container inspect $caddyname >/dev/null 2>&1 && success "Caddy 容器启动成功" || { error "错误：Caddy 容器启动失败" ; exit 7 ; }
 
-# FVTT，使用 root:root 运行避免文件权限问题
+# --- MODIFICATION START: Adjust FVTT run command for v13 ---
+# FVTT
 fvttrun="docker run -d --name=${fvttname} --restart=unless-stopped --network=${bridge} -c=${fvttcpu} "
-fvttrun="${fvttrun}-e FOUNDRY_UID='root' -e FOUNDRY_GID='root' -e CONTAINER_PRESERVE_CONFIG='true' "
-fvttrun="${fvttrun}-v ${fvttvolume}:/data -v ${fvttapp}:/home/foundry/resources/app "
+# For v13+, FOUNDRY_UID, FOUNDRY_GID, CONTAINER_PRESERVE_OWNER (and similar _CONFIG) are deprecated.
+# The container runs as 1000:1000 by default. Host volumes must have matching permissions (handled above).
+# The internal home directory changed from /home/foundry to /home/node.
+fvttrun="${fvttrun}-v ${fvttvolume}:/data -v ${fvttapp}:/home/node/resources/app " # Adjusted path
 # 默认 Minify 静态 CSS/JS 文件
 fvttrun="${fvttrun}-e FOUNDRY_MINIFY_STATIC_FILES='true' "
 # 账号密码 / 直链下载地址
@@ -428,14 +452,19 @@ fvttrun="${fvttrun}-e FOUNDRY_MINIFY_STATIC_FILES='true' "
 [ -n "$domain" ] && fvttrun="${fvttrun}-e FOUNDRY_HOSTNAME='${domain}' -e FOUNDRY_PROXY_SSL='true' -e FOUNDRY_PROXY_PORT='443' "
 [ -z "$domain" ] && fvttrun="${fvttrun}-e FOUNDRY_PROXY_PORT='${fvttport}' "
 [ -n "$canGoogle" -a "${FORCE_GLO,,}" != true ] && fvttrun="${fvttrun}-e CONTAINER_PATCH_URLS='https://fvtt-cn.coding.net/p/FoundryDeploy/d/FoundryDeploy/git/raw/master/patches/PATCH_GHProxy.sh' "
+# Note: If TIMEZONE needs to be set, use -e TZ="Your/Timezone" as per v13 breaking changes.
+# Example: fvttrun="${fvttrun}-e TZ='Asia/Shanghai' "
 fvttrun="${fvttrun} ${fvttimage}"
+# --- MODIFICATION END ---
 eval $fvttrun && docker container inspect $fvttname >/dev/null 2>&1 && success "FoundryVTT 容器启动成功" || { error "错误：FoundryVTT 容器启动失败" ; exit 7 ; }
+
 
 # FileBrowser
 if [ "$fbyn" != "n" -a "$fbyn" != "N" ]; then
     # 如果没有数据库文件，创建一个
     [ ! -f $fbdatabase ] && truncate -s 0 $fbdatabase
-    # 写死 fvttapp 映射路径为 /srv/APP
+    # 写死 fvttapp 映射路径为 /srv/APP. Note: /srv/APP within FileBrowser points to the host's fvttapp volume.
+    # This fvttapp volume is mounted as /home/node/resources/app inside the FVTT container.
     fbrun="docker run -d --name=${fbname} --restart=unless-stopped --network=${bridge} -c=${fbcpu} -m=${fbmemory} -v ${fvttvolume}:/srv -v ${fvttapp}:/srv/APP -v ${fbdatabase}:/database.db ${fbimage}"
     eval $fbrun && docker container inspect $fbname >/dev/null 2>&1 && success "FileBrowser 容器启动成功" || { error "FileBrowser 容器启动失败" ; exit 7 ; }
 fi
@@ -456,7 +485,7 @@ information -n "FoundryVTT 访问地址： " && [ -n "$domain" ] && ecyan $domai
 [ -n "$adminpass" ] && information -n "FVTT 管理密码：" && ecyan $adminpass
 if [ "$fbyn" != "n" -a "$fbyn" != "N" ]; then
     information -n "Web 文件管理器访问地址： " && [ -n "$fbdomain" ] && ecyan $fbdomain || ecyan "${publicip:-服务器地址}:${fbport}"
-    ecyan "Web 文件管理器下 APP 目录为 Foundry VTT 程序所在目录"
+    ecyan "Web 文件管理器下 APP 目录为 Foundry VTT 程序所在目录 (对应容器内 /home/node/resources/app)"
     # Web 文件管理器的用户名/密码可能在数据库里被修改
     [ -z "$@" ] && information -n "Web 文件管理器用户名/密码： " && ecyan "admin/admin （建议登录后修改）"
 fi
@@ -536,7 +565,7 @@ clear() {
         docker volume rm $caddyvolume $fvttvolume $fvttapp $dashvolume $optimempty
 
         # 删除创建的文件
-        rm $caddyfile $fbdatabase $config
+        rm -f $caddyfile $fbdatabase $config # Added -f to rm to suppress errors if files don't exist
 
         # 清理 Docker 多余镜像
         docker image prune -f
@@ -563,8 +592,11 @@ check() {
     local downloading=`docker logs ${fvttname} 2>/dev/null | grep 'Downloading Foundry Virtual Tabletop' -n | cut -f1 -d: | tail -1`
     local exists=`docker logs ${fvttname} 2>/dev/null | grep 'Foundry Virtual Tabletop.*is installed' -n | cut -f1 -d: | tail -1`
     information -n "FoundryVTT  下载状态：" && [ "${installing:--1}" -lt "${downloading:-0}" -a "${exists:--1}" -lt "${downloading:-0}" ] && warning "未完成" || ecyan "下载完毕"
-    local appDir=`docker volume inspect --format '{{ .Mountpoint }}' ${fvttapp} 2>/dev/null | head -1`
-    information -n "FoundryVTT  文件状态：" && [ -f "${appDir}/main.js" ] && ecyan "可以运行" || error "文件缺失"
+    
+    # Check for main.js inside the fvttapp volume's mount point on the host
+    local appDirHost=$(docker volume inspect --format '{{ .Mountpoint }}' ${fvttapp} 2>/dev/null | head -1)
+    # The main.js would be under resources/app within this mountpoint if using the container structure
+    information -n "FoundryVTT  文件状态：" && [ -f "${appDirHost}/resources/app/main.js" ] && ecyan "可以运行" || error "文件缺失 (检查路径: ${appDirHost}/resources/app/main.js)"
     echoLine
 
     success "以下是 FVTT 杂项检查；"
